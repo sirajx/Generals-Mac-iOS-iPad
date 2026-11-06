@@ -1,0 +1,53 @@
+name: Build iPad Port
+
+on:
+  workflow_dispatch: # Allows you to manually trigger the build with a button click
+
+jobs:
+  build:
+    runs-on: macos-14 # Spins up an Apple Silicon macOS runner with Xcode installed
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Pulls external dependencies like DXVK
+
+      - name: Install dependencies via Homebrew
+        run: |
+          brew install cmake ninja meson pkgconf xcodegen autoconf autoconf-archive automake libtool
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg ~/vcpkg
+          ~/vcpkg/bootstrap-vcpkg.sh
+
+      - name: Fetch MoltenVK and Fonts
+        run: |
+          chmod +x scripts/build/ios/*.sh
+          ./scripts/build/ios/fetch-moltenvk.sh
+          ./scripts/build/ios/stage-fonts.sh
+
+      - name: Configure and Build Engine (CMake)
+        env:
+          VCPKG_ROOT: /Users/runner/vcpkg
+        run: |
+          cmake --preset ios-vulkan
+          cmake --build --preset ios-vulkan
+
+      - name: Package Unsigned App (.ipa)
+        run: |
+          chmod +x scripts/build/ios/package-ios-zh.sh
+          # Build without code signing so we can sign it later from Windows
+          ./scripts/build/ios/package-ios-zh.sh --no-sign || true
+          
+          # Bundle the app directory into a standard .ipa archive
+          mkdir -p Payload
+          cp -r build/ios-vulkan/*.app Payload/ 2>/dev/null || cp -r *.app Payload/ 2>/dev/null || true
+          zip -r Generals-iPad.ipa Payload
+
+      - name: Upload .ipa as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Generals-iPad-App
+          path: Generals-iPad.ipa
