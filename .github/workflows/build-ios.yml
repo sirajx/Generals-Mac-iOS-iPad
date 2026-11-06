@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14 # Spins up an Apple Silicon macOS runner with Xcode installed
+    runs-on: macos-latest # Spins up an Apple Silicon macOS runner with Xcode installed
 
     steps:
       - name: Check out repository
